@@ -15,48 +15,57 @@ document.addEventListener("DOMContentLoaded", () => {
           chrome.scripting.executeScript({
             target: { tabId: newTab.id },
             func: (prompt, site) => {
-              const waitForEditorAndSendPrompt = (prompt, site) => {
-                const selector = site === "chatgpt"
-                  ? "#prompt-textarea"
-                  : 'div[contenteditable="true"][role="textbox"]';
-                console.log("🔍 selector:", selector);
-  
-                const targetNode = document.body;
-  
-                const observer = new MutationObserver((mutations, obs) => {
-                  const editor = document.querySelector(selector);
-                  console.log("🎯 editor:", document.querySelector('#prompt-textarea'));
-
-                  if (editor && editor.isContentEditable) {
-                    obs.disconnect();
-                    editor.focus();
-  
-                    const selection = window.getSelection();
-                    const range = document.createRange();
-                    range.selectNodeContents(editor);
-                    range.deleteContents();
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-  
-                    document.execCommand("insertText", false, prompt);
-  
-                    editor.dispatchEvent(new KeyboardEvent("keydown", {
-                      bubbles: true,
-                      cancelable: true,
-                      key: "Enter",
-                      code: "Enter",
-                      keyCode: 13
-                    }));
-                  }
-                });
-  
-                observer.observe(targetNode, {
-                  childList: true,
-                  subtree: true
-                });
-  
-                setTimeout(() => observer.disconnect(), 10000);
-              };
+                const waitForEditorAndSendPrompt = (prompt, site) => {
+                    const selector = site === "chatgpt"
+                      ? "#prompt-textarea"
+                      : 'div[contenteditable="true"][role="textbox"]';
+                  
+                    const targetNode = document.body;
+                  
+                    const observer = new MutationObserver((_, obs) => {
+                      const editor = document.querySelector(selector);
+                  
+                      if (editor && editor.isContentEditable) {
+                        console.log("✅ editor 見つかったよ！");
+                        obs.disconnect(); // 一度見つけたら監視終了
+                  
+                        // 🕒 3秒待機してから処理開始（任意）
+                        setTimeout(() => {
+                          editor.focus();
+                  
+                          // ✏️ テキストを直接代入
+                          editor.textContent = prompt;
+                  
+                          // 📢 InputEvent を発火して「入力された」と認識させる
+                          editor.dispatchEvent(new InputEvent("input", {
+                            bubbles: true,
+                            cancelable: true,
+                            inputType: "insertText",
+                            data: prompt
+                          }));
+                  
+                          // 🚀 Enter キーイベントを発火して送信（必要なら）
+                          editor.dispatchEvent(new KeyboardEvent("keydown", {
+                            bubbles: true,
+                            cancelable: true,
+                            key: "Enter",
+                            code: "Enter",
+                            keyCode: 13
+                          }));
+                  
+                          console.log("🎉 入力＆送信完了！");
+                        }, 3000);
+                      }
+                    });
+                  
+                    observer.observe(targetNode, {
+                      childList: true,
+                      subtree: true
+                    });
+                  
+                    // タイムアウト保険：10秒後に監視停止
+                    setTimeout(() => observer.disconnect(), 10000);
+                  };
   
               waitForEditorAndSendPrompt(prompt, site);
             },
